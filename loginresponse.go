@@ -1,5 +1,6 @@
 package steamweb
 
+//LoginResponse represents response after trying to log in
 type LoginResponse struct {
 	Success           bool   `json:"success"`
 	Message           string `json:"message,omitempty"`
@@ -16,6 +17,7 @@ type LoginResponse struct {
 	TransferParameters TransferParameters `json:"transfer_parameters,omitempty"`
 }
 
+//TransferParameters represents Session parameters
 type TransferParameters struct {
 	SteamID       string `json:"steamid"`
 	Token         string `json:"token"`

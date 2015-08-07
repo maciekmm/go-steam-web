@@ -22,18 +22,16 @@ import (
 )
 
 var (
-	IncorrectPassword  = errors.New("Incorrect password")
-	InvalidToken       = errors.New("Invalid token")
-	InvalidName        = errors.New("Invalid name")
-	errorGettingKey    = "Error while getting key, Cause: %s"
-	ServersUnavailable = errors.New("Services unavailable")
+	errorGettingKey = "Error while getting key, Cause: %s"
 )
 
+//Session holding cookies and other needed data for connecting to steam servers
 type Session struct {
 	httpClient *http.Client
-	key        SteamPublicKey
+	key        steamPublicKey
 }
 
+//GetSessionID gets session id - useful for tradeoffers and other actions
 func (sess *Session) GetSessionID() string {
 	ur, _ := url.Parse("https://steamcommunity.com")
 	cookies := sess.httpClient.Jar.Cookies(ur)
@@ -45,7 +43,7 @@ func (sess *Session) GetSessionID() string {
 	return ""
 }
 
-type SteamPublicKey struct {
+type steamPublicKey struct {
 	PublicKeyExp string `json:"publickey_exp,omitempty"`
 	PublicKeyMod string `json:"publickey_mod,omitempty"`
 	SteamID      uint64 `json:"steamid,string,omitempty"`
@@ -54,7 +52,7 @@ type SteamPublicKey struct {
 	TokenGID     string `json:"token_gid,omitempty"`
 }
 
-func (spk SteamPublicKey) modulus() (*big.Int, error) {
+func (spk steamPublicKey) modulus() (*big.Int, error) {
 	by, er := hex.DecodeString(spk.PublicKeyMod)
 	if er != nil {
 		return nil, er
@@ -63,10 +61,12 @@ func (spk SteamPublicKey) modulus() (*big.Int, error) {
 	return bi.SetBytes(by), nil
 }
 
-func (spk SteamPublicKey) exponent() (int64, error) {
+func (spk steamPublicKey) exponent() (int64, error) {
 	return strconv.ParseInt(spk.PublicKeyExp, 16, 0)
 }
 
+//NewSession creates new Session
+//The call itself is blocking due to cookies being set up.
 func NewSession() (*Session, error) {
 	jar, _ := cookiejar.New(nil)
 	sess := &Session{
@@ -82,6 +82,7 @@ func NewSession() (*Session, error) {
 	return sess, nil
 }
 
+//Login logs into steam service with given credentials
 func (sess *Session) Login(credentials Credentials) (*LoginResponse, error) {
 	key, err := sess.getRSA(credentials.Username)
 	if err != nil {
@@ -95,7 +96,6 @@ func (sess *Session) Login(credentials Credentials) (*LoginResponse, error) {
 	credentials.RSATimeStamp = strconv.FormatUint(key.Timestamp, 10)
 	credentials.DoNotCache = strconv.FormatInt(time.Now().Unix(), 10)
 	req := sess.newRequest("POST", "https://steamcommunity.com/login/dologin/", strings.NewReader(utils.ToURLValues(&credentials).Encode()))
-	fmt.Println(utils.ToURLValues(&credentials).Encode())
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	if credentials.Token != "" {
@@ -132,7 +132,7 @@ func (sess *Session) newRequest(method string, url string, body io.Reader) *http
 	return req
 }
 
-func (sess *Session) encryptPassword(password string, spk *SteamPublicKey) (string, error) {
+func (sess *Session) encryptPassword(password string, spk *steamPublicKey) (string, error) {
 	pk := new(rsa.PublicKey)
 	exp, err := spk.exponent()
 	if err != nil {
@@ -149,7 +149,7 @@ func (sess *Session) encryptPassword(password string, spk *SteamPublicKey) (stri
 	return base64.StdEncoding.EncodeToString(out), nil
 }
 
-func (sess *Session) getRSA(username string) (*SteamPublicKey, error) {
+func (sess *Session) getRSA(username string) (*steamPublicKey, error) {
 	reqParams := make(url.Values)
 	reqParams.Add("username", username)
 	reqParams.Add("donotcache", strconv.FormatUint(uint64(time.Now().Unix()), 10))
@@ -164,7 +164,7 @@ func (sess *Session) getRSA(username string) (*SteamPublicKey, error) {
 	if _, err = buf.ReadFrom(resp.Body); err != nil {
 		return nil, fmt.Errorf(errorGettingKey, err.Error())
 	}
-	spk := new(SteamPublicKey)
+	spk := new(steamPublicKey)
 	if json.Unmarshal(buf.Bytes(), spk) != nil {
 		return nil, fmt.Errorf(errorGettingKey, err.Error())
 	}

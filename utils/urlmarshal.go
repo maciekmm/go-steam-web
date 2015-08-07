@@ -6,6 +6,7 @@ import (
 	"strconv"
 )
 
+//ToURLValues converts struct to url.Values - useful for making POST form requests
 func ToURLValues(inter interface{}) url.Values {
 	values := make(url.Values)
 	iVal := reflect.ValueOf(inter).Elem()

@@ -1,5 +1,6 @@
 package steamweb
 
+//Credentials represents a request parameters for logging in proccess
 type Credentials struct {
 	Password          string `uval:"password"`
 	Username          string `uval:"username"`
@@ -16,6 +17,7 @@ type Credentials struct {
 	DoNotCache        string `uval:"donotcache"`
 }
 
+//NewCredentials creates minimum required parameters for logging in proccess
 func NewCredentials(username, password, steamid string) Credentials {
 	return Credentials{
 		Username: username,
