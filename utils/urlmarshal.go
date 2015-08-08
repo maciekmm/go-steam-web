@@ -35,8 +35,11 @@ func ToURLValues(inter interface{}) url.Values {
 			}
 		}
 		tag := typ.Field(i).Tag.Get("uval")
-		if tag == "-" || tag == "" {
+		if tag == "-" {
 			continue
+		}
+		if tag == "" {
+			tag = typ.Field(i).Name
 		}
 		values.Set(tag, v)
 	}

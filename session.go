@@ -27,20 +27,31 @@ var (
 
 //Session holding cookies and other needed data for connecting to steam servers
 type Session struct {
-	httpClient *http.Client
+	HTTPClient *http.Client
 	key        steamPublicKey
 }
 
 //GetSessionID gets session id - useful for tradeoffers and other actions
 func (sess *Session) GetSessionID() string {
 	ur, _ := url.Parse("https://steamcommunity.com")
-	cookies := sess.httpClient.Jar.Cookies(ur)
+	cookies := sess.HTTPClient.Jar.Cookies(ur)
 	for _, v := range cookies {
 		if v.Name == "sessionid" {
 			return v.Value
 		}
 	}
 	return ""
+}
+
+func (sess *Session) IsLoggedIn() bool {
+	ur, _ := url.Parse("https://steamcommunity.com")
+	cookies := sess.HTTPClient.Jar.Cookies(ur)
+	for _, v := range cookies {
+		if v.Name == "steamLogin" {
+			return true
+		}
+	}
+	return false
 }
 
 type steamPublicKey struct {
@@ -70,11 +81,11 @@ func (spk steamPublicKey) exponent() (int64, error) {
 func NewSession() (*Session, error) {
 	jar, _ := cookiejar.New(nil)
 	sess := &Session{
-		httpClient: &http.Client{
+		HTTPClient: &http.Client{
 			Jar: jar,
 		},
 	}
-	resp, err := sess.httpClient.Do(sess.newRequest("GET", "https://steamcommunity.com", nil))
+	resp, err := sess.HTTPClient.Do(sess.NewRequest("GET", "https://steamcommunity.com", nil))
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +106,7 @@ func (sess *Session) Login(credentials Credentials) (*LoginResponse, error) {
 	credentials.Password = encryptedPassword
 	credentials.RSATimeStamp = strconv.FormatUint(key.Timestamp, 10)
 	credentials.DoNotCache = strconv.FormatInt(time.Now().Unix(), 10)
-	req := sess.newRequest("POST", "https://steamcommunity.com/login/dologin/", strings.NewReader(utils.ToURLValues(&credentials).Encode()))
+	req := sess.NewRequest("POST", "https://steamcommunity.com/login/dologin/", strings.NewReader(utils.ToURLValues(&credentials).Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	if credentials.Token != "" {
@@ -108,7 +119,7 @@ func (sess *Session) Login(credentials Credentials) (*LoginResponse, error) {
 			Secure: true,
 		})
 	}
-	resp, err := sess.httpClient.Do(req)
+	resp, err := sess.HTTPClient.Do(req)
 
 	if err != nil {
 		return nil, err
@@ -123,7 +134,8 @@ func (sess *Session) Login(credentials Credentials) (*LoginResponse, error) {
 	return loginr, err
 }
 
-func (sess *Session) newRequest(method string, url string, body io.Reader) *http.Request {
+//NewRequest creates new request with useragent setup to avoid captcha
+func (sess *Session) NewRequest(method string, url string, body io.Reader) *http.Request {
 	req, err := http.NewRequest(method, url, body)
 	req.Header.Set("User-Agent", "Mozilla/5.0 ;Windows NT 6.1; WOW64; Trident/7.0; rv:11.0; like Gecko")
 	if err != nil {
@@ -153,9 +165,9 @@ func (sess *Session) getRSA(username string) (*steamPublicKey, error) {
 	reqParams := make(url.Values)
 	reqParams.Add("username", username)
 	reqParams.Add("donotcache", strconv.FormatUint(uint64(time.Now().Unix()), 10))
-	req := sess.newRequest("POST", "https://steamcommunity.com/login/getrsakey/", strings.NewReader(reqParams.Encode()))
+	req := sess.NewRequest("POST", "https://steamcommunity.com/login/getrsakey/", strings.NewReader(reqParams.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := sess.httpClient.Do(req)
+	resp, err := sess.HTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf(errorGettingKey, err.Error())
 	}
