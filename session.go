@@ -22,7 +22,8 @@ import (
 )
 
 var (
-	errorGettingKey = "Error while getting key, Cause: %s"
+	errorGettingKey            = "Error while getting key, Cause: %s"
+	SteamCommunityUnvavailable = errors.New("Steam community is unavailable")
 )
 
 //Session holding cookies and other needed data for connecting to steam servers
@@ -85,7 +86,7 @@ func NewSession() (*Session, error) {
 			Jar: jar,
 		},
 	}
-	resp, err := sess.HTTPClient.Do(sess.NewRequest("GET", "https://steamcommunity.com", nil))
+	resp, err := utils.RetryRequest(3, sess.HTTPClient, sess.NewRequest("GET", "https://steamcommunity.com", nil))
 	if err != nil {
 		return nil, err
 	}
@@ -119,12 +120,14 @@ func (sess *Session) Login(credentials Credentials) (*LoginResponse, error) {
 			Secure: true,
 		})
 	}
-	resp, err := sess.HTTPClient.Do(req)
-
+	resp, err := utils.RetryRequest(3, sess.HTTPClient, req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, SteamCommunityUnvavailable
+	}
 	loginr := new(LoginResponse)
 	buf := new(bytes.Buffer)
 	if _, err = buf.ReadFrom(resp.Body); err != nil {
@@ -167,7 +170,7 @@ func (sess *Session) getRSA(username string) (*steamPublicKey, error) {
 	reqParams.Add("donotcache", strconv.FormatUint(uint64(time.Now().Unix()), 10))
 	req := sess.NewRequest("POST", "https://steamcommunity.com/login/getrsakey/", strings.NewReader(reqParams.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := sess.HTTPClient.Do(req)
+	resp, err := utils.RetryRequest(3, sess.HTTPClient, req)
 	if err != nil {
 		return nil, fmt.Errorf(errorGettingKey, err.Error())
 	}
