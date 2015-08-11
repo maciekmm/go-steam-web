@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-querystring/query"
 	"github.com/maciekmm/go-steam-web/utils"
 )
 
@@ -107,7 +108,11 @@ func (sess *Session) Login(credentials Credentials) (*LoginResponse, error) {
 	credentials.Password = encryptedPassword
 	credentials.RSATimeStamp = strconv.FormatUint(key.Timestamp, 10)
 	credentials.DoNotCache = strconv.FormatInt(time.Now().Unix(), 10)
-	req := sess.NewRequest("POST", "https://steamcommunity.com/login/dologin/", strings.NewReader(utils.ToURLValues(&credentials).Encode()))
+	vals, err := query.Values(&credentials)
+	if err != nil {
+		return nil, err
+	}
+	req := sess.NewRequest("POST", "https://steamcommunity.com/login/dologin/", strings.NewReader(vals.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	if credentials.Token != "" {
