@@ -87,9 +87,13 @@ func NewSession() (*Session, error) {
 			Jar: jar,
 		},
 	}
-	resp, err := utils.RetryRequest(3, sess.HTTPClient, sess.NewRequest("GET", "https://steamcommunity.com", nil))
+	resp, err := sess.HTTPClient.Get("https://steamcommunity.com")
 	if err != nil {
 		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, SteamCommunityUnvavailable
 	}
 	defer resp.Body.Close()
 	return sess, nil
